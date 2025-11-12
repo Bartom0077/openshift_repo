@@ -1,43 +1,57 @@
-apiVersion: 1.0.0
+schemaVersion: 2.2.0
 metadata:
   name: openshift_repo
+
 projects:
   - name: openshift_repo
     git:
       remotes:
         origin: https://github.com/Bartom0077/openshift_repo.git
+
 components:
-  - name: vscode
+  # Edytor: Che Code (VS Code experience)
+  - name: che-code
     type: cheEditor
-    reference: vscode
+    reference: che-incubator/che-code/latest
+
   - name: nodejs
     container:
-      image: quay.io/devspaces/nodejs:16
+      image: quay.io/devspaces/node:18
       memoryLimit: 2Gi
       mountSources: true
-      command:
-        - tail
-        - -f
-        - /dev/null
-    labels:
-      package: runtime
+      command: ["tail", "-f", "/dev/null"]
+
   - name: python
     container:
       image: quay.io/devspaces/python:3.11
       memoryLimit: 2Gi
       mountSources: true
-      command:
-        - tail
-        - -f
-        - /dev/null
-    labels:
-      package: runtime
+      command: ["tail", "-f", "/dev/null"]
+
 commands:
-  - id: che:package
-    type: exec
-    label: Install packages
-    component: nodejs
-    commandLine: |
-      echo "Installing packages for nodejs and python..."
-      npm install
-      pip install -r requirements.txt
+  - id: npm-install
+    exec:
+      label: Install Node packages
+      component: nodejs
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: npm ci || npm install
+
+  - id: pip-install
+    exec:
+      label: Install Python packages
+      component: python
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: |
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+          echo "No requirements.txt, skipping"
+        fi
+
+  - id: bootstrap
+    composite:
+      label: Bootstrap workspace (Node + Python)
+      commands:
+        - npm-install
+        - pip-install
+      parallel: true
